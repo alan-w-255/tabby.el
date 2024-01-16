@@ -30,3 +30,8 @@ Here is my configuration.
 (evil-define-key 'insert tabby-mode-map
   (kbd "C-l") 'tabby-accept-completion-by-line)
 ```
+
+## warning
+
+This plugin works on my machine, but there may be many bugs that have not been discovered yet. Please feel free to raise an issue if you encounter any problems.
+
