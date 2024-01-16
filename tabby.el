@@ -5,6 +5,7 @@
 (require 'json)
 (require 'cl)
 (require 's)
+(require 'dash)
 
 (defgroup tabby nil
   "Tabby."
