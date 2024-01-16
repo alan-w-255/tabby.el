@@ -187,10 +187,11 @@ Enabling event logging may slightly affect performance."
 (defun tabby--agent-connection-filter (process string)
   "Filter for tabby agent PROCESS."
   (with-current-buffer (process-buffer process)
-	(insert string) ;; debug
-	(when-let ((inhibit-read-only t)
-			   (parsed (ignore-errors (json-parse-string string :object-type 'plist :array-type 'list))))
-	  (tabby--agent-handle-response parsed))))
+	(let ((inhibit-read-only t))
+	  (goto-char (point-max))
+	  (insert string)
+	  (when-let ((parsed (ignore-errors (json-parse-string string :object-type 'plist :array-type 'list))))
+		(tabby--agent-handle-response parsed)))))
 
 (defun tabby--agent-connection-sentinel (proc event)
   (if (or (string= event "finished\n")
@@ -492,21 +493,12 @@ Use TRANSFORM-FN to transform completion if provided."
 (tabby--define-accept-completion-by-action tabby-accept-completion-by-word #'forward-word)
 (tabby--define-accept-completion-by-action tabby-accept-completion-by-line #'forward-line)
 
-(evil-define-key 'insert tabby-mode-map
-  (kbd "C-<tab>") 'tabby-accept-completion-by-word)
-
-(evil-define-key 'insert tabby-mode-map
-  (kbd "C-l") 'tabby-accept-completion-by-line)
-
 
 ;;; tabby-mode
 
 (defvar tabby-mode-map (make-sparse-keymap)
   "Keymap for Tabby minor mode.
 Use this for custom bindings in `tabby-mode'.")
-
-(evil-define-key 'insert tabby-mode-map
-  (kbd "C-j") 'tabby-accept-completion)
 
 (defvar tabby--post-command-timer nil)
 (defcustom tabby-idle-delay 0
