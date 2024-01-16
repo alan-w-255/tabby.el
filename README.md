@@ -4,7 +4,7 @@ An unofficial [tabby](https://github.com/TabbyML/tabby) plugin for Emacs. Heavil
 
 ## Install
 
-Ensure you installed Node.js v18+. (You can specify the path to node executable by setting copilot-node-executable.)
+Ensure you installed Node.js v18+. (You can specify the path to node executable by setting tabby-node-executable.)
 
 git clone this repository.
 
