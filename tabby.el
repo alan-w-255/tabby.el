@@ -91,8 +91,6 @@ Enabling event logging may slightly affect performance."
 					   (when cb
 						 (with-current-buffer buf
 						   (funcall cb response))))))
-    (unless (tabby--connection-alivep)
-	  (tabby--agent-open))
 	(push (cons id on-success) tabby--agent-request-callback-alist)
 	(process-send-string tabby--connection (concat (json-encode request) "\n"))
 	id))
