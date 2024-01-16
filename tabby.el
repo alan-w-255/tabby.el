@@ -337,6 +337,10 @@ Tabby will not be triggered if any predicate returns t."
 (defun tabby--satisfy-trigger-predicates ()
   (tabby--satisfy-predicates tabby-enable-predicates tabby-disable-predicates))
 
+(defvar tabby-mode-map (make-sparse-keymap)
+  "Keymap for Tabby minor mode.
+Use this for custom bindings in `tabby-mode'.")
+
 ;;;###autoload
 (define-minor-mode tabby-mode
   "Minor mode for Tabby."
