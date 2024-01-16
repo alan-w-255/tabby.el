@@ -3,7 +3,7 @@
 ;;; commentary:
 ;;; code
 (require 'json)
-(require 'cl)
+(require 'cl-lib)
 (require 's)
 (require 'dash)
 
