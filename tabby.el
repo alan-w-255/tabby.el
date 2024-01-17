@@ -57,11 +57,6 @@ Enabling event logging may slightly affect performance."
   :group 'tabby
   :type 'string)
 
-(defcustom tabby-max-char 15000
-  "Maximum number of characters to send to Tabby server."
-  :group 'tabby
-  :type 'integer)
-
 (defconst tabby-version "1.2.0"
   "Tabby version.")
 
@@ -236,8 +231,6 @@ Enabling event logging may slightly affect performance."
 
 
 ;;; completion
-(defvar tabby--position-offset 0
-  "Position offset.")
 
 (defvar tabby-major-mode-alist '(("rustic" . "rust")
 				 ("cperl" . "perl")
@@ -270,33 +263,18 @@ Enabling event logging may slightly affect performance."
 
 (defun tabby--get-completion-context (is-manual)
   "Get completion context."
-  (let ((half-tabby-max-char (/ tabby-max-char 2))
-	(pos (1- (point)))
-	text)
-    (cond ((< (point-max) tabby-max-char)
-	   (setq text (buffer-substring-no-properties (point-min) (point-max)))
-	   (setq tabby--position-offset 0))
-	  ((< (point) half-tabby-max-char)
-	   (setq text (buffer-substring-no-properties (point-min) tabby-max-char))
-	   (setq tabby--position-offset 0))
-	  ((> (+ (point) half-tabby-max-char) (point-max))
-	   (setq text (buffer-substring-no-properties (- (point-max) tabby-max-char) (point-max)))
-	   (setq tabby--position-offset (- (point-max) tabby-max-char 1))
-	   (setq pos (- (point) tabby--position-offset 1)))
-	  (t
-	   (setq text (buffer-substring-no-properties (- (point) half-tabby-max-char) (+ (point) half-tabby-max-char)))))
-    `(:filepath
-      ,(buffer-file-name)
-      :language
-      ,(tabby--get-language)
-      :text
-      ,text
-      :position
-      ,pos
-      :manually
-      ,(if is-manual
-	   t
-	 :json-false))))
+  `(:filepath
+    ,(buffer-file-name)
+    :language
+    ,(tabby--get-language)
+    :text
+    ,(buffer-substring-no-properties (point-min) (point-max))
+    :position
+    ,(1- (point))
+    :manually
+    ,(if is-manual
+	 t
+       :json-false)))
 
 (defvar tabby--current-completion-request nil
   "Current completion request.")
@@ -476,8 +454,8 @@ command that triggered `post-command-hook'."
 	      (text (substring choice-text prefix-replace-chars))
 	      ((not (zerop (length text))))
 	      (ov (tabby--get-overlay)))
-    (when (= (point) (+ 1 tabby--position-offset pos))
-      (overlay-put ov 'replace-end (+ 1 tabby--position-offset end))
+    (when (= (point) (1+ pos))
+      (overlay-put ov 'replace-end (1+ end))
       (overlay-put ov 'suffix-replace-chars suffix-replace-chars)
       (overlay-put ov 'completion-id (plist-get (cadr response) :id))
       (overlay-put ov 'choice-index (plist-get choice :index))
