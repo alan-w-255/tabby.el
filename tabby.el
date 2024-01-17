@@ -156,6 +156,7 @@ Enabling event logging may slightly affect performance."
                                  :noquery t))
              (message "Tabby agent started.")
              (tabby--agent-initialize))))))
+
 (defmacro tabby--ensure-connection-alive (&rest body)
   `(progn
      (unless (tabby--connection-alivep)
@@ -533,12 +534,8 @@ Use TRANSFORM-FN to transform completion if provided."
 
 
 ;;; tabby-mode
-
-(defvar tabby-mode-map (make-sparse-keymap)
-  "Keymap for Tabby minor mode.
-Use this for custom bindings in `tabby-mode'.")
-
 (defvar tabby--post-command-timer nil)
+
 (defcustom tabby-idle-delay 0
   "Time in seconds to wait before starting completion.
 
