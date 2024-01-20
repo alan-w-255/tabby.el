@@ -15,6 +15,8 @@ git clone this repository.
 ;; example. active tabby-mode locally when entering go-ts-mode.
 (add-hook 'go-ts-mode-hook 'tabby-mode)
 ```
+ 
+!important! Follow the [document](https://tabby.tabbyml.com/docs/extensions/configurations#server) to config the tabby agent.
 
 ## Usage
 
