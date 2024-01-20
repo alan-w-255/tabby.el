@@ -16,7 +16,8 @@ git clone this repository.
 (add-hook 'go-ts-mode-hook 'tabby-mode)
 ```
  
-!important! Follow the [document](https://tabby.tabbyml.com/docs/extensions/configurations#server) to config the tabby agent.
+!!important!!
+Follow the [document](https://tabby.tabbyml.com/docs/extensions/configurations) to config the tabby client.
 
 ## Usage
 
