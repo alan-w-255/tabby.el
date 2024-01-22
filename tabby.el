@@ -210,6 +210,24 @@ Tabby will not show completions if any predicate returns t."
     (process-send-string tabby--connection (concat (json-encode request) "\n"))
     id))
 
+(defun tabby--agent-connection-filter (process string)
+  "Filter for tabby agent PROCESS."
+  (with-current-buffer (process-buffer process)
+    (let ((inhibit-read-only t))
+      (goto-char (point-max))
+      (insert string)
+      (when-let ((parsed (ignore-errors (json-parse-string string :object-type 'plist :array-type 'list))))
+	(tabby--agent-handle-response parsed)))))
+
+(defun tabby--agent-connection-sentinel (_proc event)
+  "Sentinel for tabby agent PROCESS."
+  (if (or (string= event "finished\n")
+	  (string= event "deleted\n"))
+      (progn
+	(setq tabby--agent-status "exited")
+	(message "Tabby agent exited: %s" event))
+    (user-error "Tabby agent exited unexpectedly: %s" event)))
+
 (defun tabby--agent-start ()
   "Start the tabby agent process in local."
   (interactive)
@@ -302,23 +320,7 @@ Tabby will not show completions if any predicate returns t."
     (funcall cb response)
     (setq tabby--agent-request-callback-alist (assq-delete-all id tabby--agent-request-callback-alist))))
 
-(defun tabby--agent-connection-filter (process string)
-  "Filter for tabby agent PROCESS."
-  (with-current-buffer (process-buffer process)
-    (let ((inhibit-read-only t))
-      (goto-char (point-max))
-      (insert string)
-      (when-let ((parsed (ignore-errors (json-parse-string string :object-type 'plist :array-type 'list))))
-	(tabby--agent-handle-response parsed)))))
 
-(defun tabby--agent-connection-sentinel (_proc event)
-  "Sentinel for tabby agent PROCESS."
-  (if (or (string= event "finished\n")
-	  (string= event "deleted\n"))
-      (setq tabby--agent-status "exited"))
-  (if (string-match "failed with code -?[0-9]+\n" event)
-      ;; todo
-      (error event)))
 
 
 ;;; completion
