@@ -2,7 +2,7 @@
 
 ;; Author: Alan Wong <heywym@qq.com>
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.2") (s "1.12.0") (dash "2.19.1"))
+;; Package-Requires: ((emacs "27.2") (s "1.12.0"))
 ;; Keywords: tabby, completion, llm, copilot
 ;; URL: http://github.com/alan-w-255/tabby.el
 
@@ -36,7 +36,6 @@
 (require 'json)
 (require 'cl-lib)
 (require 's)
-(require 'dash)
 
 (defgroup tabby nil
   "Tabby."
@@ -244,11 +243,11 @@ Use this for custom bindings in `tabby-mode'.")
   (interactive)
   (if (not (locate-file tabby-node-executable exec-path))
       (user-error "Could not find node executable")
-    (let ((node-version (->> (with-output-to-string
-                               (call-process tabby-node-executable nil standard-output nil "--version"))
-                             (s-trim)
-                             (s-chop-prefix "v")
-                             (string-to-number))))
+    (let ((node-version (thread-last (with-output-to-string
+				       (call-process tabby-node-executable nil standard-output nil "--version"))
+				     (s-trim)
+				     (s-chop-prefix "v")
+				     (string-to-number))))
       (cond ((< node-version 18)
              (user-error "Node 18+ is required but found %s" node-version))
             (t
