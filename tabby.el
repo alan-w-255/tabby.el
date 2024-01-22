@@ -43,6 +43,11 @@
   :group 'completion
   :prefix "tabby-")
 
+(defconst tabby-version "1.2.0"
+  "Tabby version.")
+
+;; custom
+
 (defcustom tabby-log-max 10000
   "Max size of events buffer. 0 disables, nil means infinite.
 Enabling event logging may slightly affect performance."
@@ -57,45 +62,6 @@ Enabling event logging may slightly affect performance."
   :group 'tabby
   :type 'string)
 
-(defconst tabby-version "1.2.0"
-  "Tabby version.")
-
-(defconst tabby--base-dir
-  (file-name-directory
-   (or load-file-name
-       (buffer-file-name)))
-  "Directory containing this file.")
-
-(defvar-local tabby--overlay nil
-  "Overlay for tabby completion.")
-
-(defvar tabby--connection nil
-  "Tabby agent jsonrpc connection instance.")
-
-(defsubst tabby--connection-alivep ()
-  "Non-nil if the `tabby--connection' is alive."
-  (and tabby--connection
-       (process-live-p tabby--connection)))
-
-(defvar tabby--request-id 0)
-
-(defvar tabby-mode-map (make-sparse-keymap)
-  "Keymap for Tabby minor mode.
-Use this for custom bindings in `tabby-mode'.")
-
-(defconst tabby--ignore-response
-  (lambda (_))
-  "Simply ignore the response.")
-
-(defvar tabby-trigger-mode "auto"
-  "Trigger mode.")
-
-(defvar tabby--current-completion-request nil
-  "Current completion request.")
-
-(defvar tabby--current-completion-response nil
-  "Current completion response.")
-
 (defcustom tabby-clear-overlay-ignore-commands nil
   "List of commands that should not clear the overlay when called."
   :group 'tabby
@@ -104,31 +70,14 @@ Use this for custom bindings in `tabby-mode'.")
 (defcustom tabby-enable-predicates '(evil-insert-state-p)
   "A list of predicate functions with no argument to enable Tabby.
 Tabby will be triggered only if all predicates return t."
-  :type '(repeat function)
-  :group 'tabby)
-
-(defvar tabby--agent-status nil
-  "Tabby agent status.")
-
-(defvar tabby--agent-issue nil
-  "Tabby agent issue.")
-
-(defvar tabby--ongoing-request-id 0
-  "Ongoing request id.")
-
-(defvar tabby--agent-request-callback-alist nil
-  "Alist mapping request id's to callbacks.")
-
-(defvar tabby--status "initialization_done")
+  :group 'tabby
+  :type '(repeat function))
 
 (defcustom tabby-disable-predicates nil
   "A list of predicate functions with no argument to disable Tabby.
 Tabby will not be triggered if any predicate returns t."
   :type '(repeat function)
   :group 'tabby)
-
-(defvar tabby--post-command-timer nil
-  "Timer for tabby completion.")
 
 (defcustom tabby-idle-delay 0
   "Time in seconds to wait before starting completion.
@@ -177,9 +126,64 @@ Tabby will not show completions if any predicate returns t."
   "Alist mapping major mode names (with -mode removed) to Tabby language ID's."
   :type '(alist :key-type string :value-type string)
   :group 'tabby)
-
 
-;;; agent
+;; vars
+
+(defconst tabby--base-dir
+  (file-name-directory
+   (or load-file-name
+       (buffer-file-name)))
+  "Directory containing this file.")
+
+(defvar-local tabby--overlay nil
+  "Overlay for tabby completion.")
+
+(defvar tabby--connection nil
+  "Tabby agent jsonrpc connection instance.")
+
+(defvar tabby--request-id 0
+  "Request id.")
+
+(defvar tabby-mode-map (make-sparse-keymap)
+  "Keymap for Tabby minor mode.
+Use this for custom bindings in `tabby-mode'.")
+
+(defvar tabby-trigger-mode "auto"
+  "Trigger mode.")
+
+(defvar tabby--current-completion-request nil
+  "Current completion request.")
+
+(defvar tabby--current-completion-response nil
+  "Current completion response.")
+
+(defvar tabby--agent-status nil
+  "Tabby agent status.")
+
+(defvar tabby--agent-issue nil
+  "Tabby agent issue.")
+
+(defvar tabby--ongoing-request-id 0
+  "Ongoing request id.")
+
+(defvar tabby--agent-request-callback-alist nil
+  "Alist mapping request id's to callbacks.")
+
+(defvar tabby--status "initialization_done")
+
+(defvar tabby--post-command-timer nil
+  "Timer for tabby completion.")
+
+;; utils
+
+(defsubst tabby--connection-alivep ()
+  "Non-nil if the `tabby--connection' is alive."
+  (and tabby--connection
+       (process-live-p tabby--connection)))
+
+(defconst tabby--ignore-response
+  (lambda (_))
+  "Simply ignore the response.")
 
 (defun tabby--next-request-id ()
   "Get the next request id."
@@ -209,6 +213,13 @@ Tabby will not show completions if any predicate returns t."
     (push (cons id on-success) tabby--agent-request-callback-alist)
     (process-send-string tabby--connection (concat (json-encode request) "\n"))
     id))
+
+(defun tabby--get-language ()
+  "Get language of current buffer."
+  (let ((mode (replace-regexp-in-string "-mode\\'\\|-ts-mode\\'" "" (symbol-name major-mode))))
+    (alist-get mode tabby-major-mode-alist mode nil 'equal)))
+
+;;; agent
 
 (defun tabby--agent-connection-filter (process string)
   "Filter for tabby agent PROCESS."
@@ -320,15 +331,8 @@ Tabby will not show completions if any predicate returns t."
     (funcall cb response)
     (setq tabby--agent-request-callback-alist (assq-delete-all id tabby--agent-request-callback-alist))))
 
-
-
 
 ;;; completion
-
-(defun tabby--get-language ()
-  "Get language of current buffer."
-  (let ((mode (replace-regexp-in-string "-mode\\'\\|-ts-mode\\'" "" (symbol-name major-mode))))
-    (alist-get mode tabby-major-mode-alist mode nil 'equal)))
 
 (defun tabby--get-completion-context (is-manual)
   "Get completion context."
@@ -398,6 +402,7 @@ Tabby will not show completions if any predicate returns t."
 
 
 ;;; ui
+
 (defface tabby-overlay-face
   '((t :inherit shadow))
   "Face for tabby overlay")
