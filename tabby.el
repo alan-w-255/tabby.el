@@ -271,6 +271,8 @@ Enabling event logging may slightly affect performance."
     ,(buffer-substring-no-properties (point-min) (point-max))
     :position
     ,(1- (point))
+    :clipboard
+    ,(substring-no-properties (or (car kill-ring) ""))
     :manually
     ,(if is-manual
 	 t
