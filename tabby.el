@@ -79,9 +79,9 @@ Enabling event logging may slightly affect performance."
 
 (defvar tabby--request-id 0)
 
-(defun tabby--next-request-id ()
-  (setq tabby--request-id (1+ tabby--request-id))
-  tabby--request-id)
+(defvar tabby-mode-map (make-sparse-keymap)
+  "Keymap for Tabby minor mode.
+Use this for custom bindings in `tabby-mode'.")
 
 (defconst tabby--ignore-response
   (lambda (_))
@@ -89,6 +89,102 @@ Enabling event logging may slightly affect performance."
 
 (defvar tabby-trigger-mode "auto"
   "Trigger mode.")
+
+(defvar tabby--current-completion-request nil
+  "Current completion request.")
+
+(defvar tabby--current-completion-response nil
+  "Current completion response.")
+
+(defcustom tabby-clear-overlay-ignore-commands nil
+  "List of commands that should not clear the overlay when called."
+  :group 'tabby
+  :type '(repeat function))
+
+(defcustom tabby-enable-predicates '(evil-insert-state-p)
+  "A list of predicate functions with no argument to enable Tabby.
+Tabby will be triggered only if all predicates return t."
+  :type '(repeat function)
+  :group 'tabby)
+
+(defvar tabby--agent-status nil
+  "Tabby agent status.")
+
+(defvar tabby--agent-issue nil
+  "Tabby agent issue.")
+
+(defvar tabby--ongoing-request-id 0
+  "Ongoing request id.")
+
+(defvar tabby--agent-request-callback-alist nil
+  "Alist mapping request id's to callbacks.")
+
+(defvar tabby--status "initialization_done")
+
+(defcustom tabby-disable-predicates nil
+  "A list of predicate functions with no argument to disable Tabby.
+Tabby will not be triggered if any predicate returns t."
+  :type '(repeat function)
+  :group 'tabby)
+
+(defvar tabby--post-command-timer nil
+  "Timer for tabby completion.")
+
+(defcustom tabby-idle-delay 0
+  "Time in seconds to wait before starting completion.
+
+Complete immediately if set to 0.
+Disable idle completion if set to nil."
+  :type '(choice
+          (number :tag "Seconds of delay")
+          (const :tag "Idle completion disabled" nil))
+  :group 'tabby)
+
+(defcustom tabby-enable-display-predicates nil
+  "A list of predicate functions with no argument to enable Tabby.
+Tabby will show completions only if all predicates return t."
+  :type '(repeat function)
+  :group 'tabby)
+
+(defcustom tabby-disable-display-predicates nil
+  "A list of predicate functions with no argument to disable Tabby.
+Tabby will not show completions if any predicate returns t."
+  :type '(repeat function)
+  :group 'tabby)
+
+(defcustom tabby-major-mode-alist '(("rustic" . "rust")
+				    ("cperl" . "perl")
+				    ("c++" . "cpp")
+				    ("clojurec" . "clojure")
+				    ("clojurescript" . "clojure")
+				    ("objc" . "objective-c")
+				    ("cuda" . "cuda-cpp")
+				    ("docker-compose" . "dockercompose")
+				    ("coffee" . "coffeescript")
+				    ("js" . "javascript")
+				    ("js2" . "javascript")
+				    ("js2-jsx" . "javascriptreact")
+				    ("typescript-tsx" . "typescriptreact")
+				    ("rjsx" . "typescriptreact")
+				    ("less-css" . "less")
+				    ("text" . "plaintext")
+				    ("ess-r" . "r")
+				    ("enh-ruby" . "ruby")
+				    ("shell-script" . "shellscript")
+				    ("sh" . "shellscript")
+				    ("visual-basic" . "vb")
+				    ("nxml" . "xml"))
+  "Alist mapping major mode names (with -mode removed) to Tabby language ID's."
+  :type '(alist :key-type string :value-type string)
+  :group 'tabby)
+
+
+;;; agent
+
+(defun tabby--next-request-id ()
+  "Get the next request id."
+  (setq tabby--request-id (1+ tabby--request-id))
+  tabby--request-id)
 
 (defun tabby--get-client-properties ()
   "Get client properties."
@@ -99,19 +195,8 @@ Enabling event logging may slightly affect performance."
 	     :ide (:name "Emacs" :version ,(car (split-string emacs-version "\n")))
 	     :tabby_plugin (:name "TabbyML/emacs-tabby" :version ,tabby-version))))
 
-
-;;; agent
-(defvar tabby--agent-status nil
-  "Tabby agent status.")
-
-(defvar tabby--agent-issue nil
-  "Tabby agent issue.")
-
-(defvar tabby--agent-request-callback-alist nil
-  "Alist mapping request id's to callbacks.")
-
 (defun tabby--request (args &optional cb)
-  "Send a request to the tabby agent with ARGS."
+  "Send a request to the tabby agent with ARGS. CB is called with the response."
   (unless (tabby--connection-alivep)
     (tabby--agent-start))
   (let* ((id (tabby--next-request-id))
@@ -153,6 +238,7 @@ Enabling event logging may slightly affect performance."
              (tabby--agent-initialize))))))
 
 (defmacro tabby--ensure-connection-alive (&rest body)
+  "Evaluate BODY if the tabby agent is alive. If not, start the agent."
   `(progn
      (unless (tabby--connection-alivep)
        (tabby--agent-start))
@@ -169,37 +255,41 @@ Enabling event logging may slightly affect performance."
    (setq tabby--request-id 0)))
 
 (defun tabby--agent-on-error (data)
+  "Handle agent error, DATA is the error message."
   (message "Tabby agent error: %s" data))
 
 (defun tabby--agent-on-exit (data)
+  "Handle agent exit, DATA is the exit message."
   (setq tabby--connection nil)
   (setq tabby--agent-status "exited")
   (message "Tabby agent exited: %s" data))
 
 (defun tabby--agent-initialize ()
+  "Initialize the tabby agent."
   (tabby--ensure-connection-alive
    (tabby--request `(:func initialize :args [(:clientProperties ,(tabby--get-client-properties))]))))
 
 (defun tabby--agent-provide-completions (request cb)
+  "Provide completions for REQUEST. Call CB with the result."
   (tabby--ensure-connection-alive
    (tabby--request `(:func
 		     provideCompletions
 		     :args
 		     [,request :signal t]) cb)))
 
-(defvar tabby--ongoing-request-id 0
-  "Ongoing request id.")
-
 (defun tabby--agent-cancel-request (request-id)
+  "Cancel request with REQUEST-ID."
   (tabby--ensure-connection-alive
    (tabby--request `(:func cancelRequest :args [,request-id]))
    (setq tabby--ongoing-request-id 0)))
 
 (defun tabby--agent-post-event (event)
+  "Post EVENT to the tabby agent."
   (tabby--ensure-connection-alive
    (tabby--request `(:func postEvent :args [,event]))))
 
 (defun tabby--agent-handle-response (response)
+  "Handle RESPONSE from the tabby agent."
   (when-let ((data (cadr response))
 	     (event (plist-get data :event)))
     (cl-case event
@@ -222,6 +312,7 @@ Enabling event logging may slightly affect performance."
 	(tabby--agent-handle-response parsed)))))
 
 (defun tabby--agent-connection-sentinel (_proc event)
+  "Sentinel for tabby agent PROCESS."
   (if (or (string= event "finished\n")
 	  (string= event "deleted\n"))
       (setq tabby--agent-status "exited"))
@@ -231,30 +322,6 @@ Enabling event logging may slightly affect performance."
 
 
 ;;; completion
-
-(defvar tabby-major-mode-alist '(("rustic" . "rust")
-				 ("cperl" . "perl")
-				 ("c++" . "cpp")
-				 ("clojurec" . "clojure")
-				 ("clojurescript" . "clojure")
-				 ("objc" . "objective-c")
-				 ("cuda" . "cuda-cpp")
-				 ("docker-compose" . "dockercompose")
-				 ("coffee" . "coffeescript")
-				 ("js" . "javascript")
-				 ("js2" . "javascript")
-				 ("js2-jsx" . "javascriptreact")
-				 ("typescript-tsx" . "typescriptreact")
-				 ("rjsx" . "typescriptreact")
-				 ("less-css" . "less")
-				 ("text" . "plaintext")
-				 ("ess-r" . "r")
-				 ("enh-ruby" . "ruby")
-				 ("shell-script" . "shellscript")
-				 ("sh" . "shellscript")
-				 ("visual-basic" . "vb")
-				 ("nxml" . "xml"))
-  "Alist mapping major mode names (with -mode removed) to Tabby language ID's.")
 
 (defun tabby--get-language ()
   "Get language of current buffer."
@@ -278,15 +345,8 @@ Enabling event logging may slightly affect performance."
 	 t
        :json-false)))
 
-(defvar tabby--current-completion-request nil
-  "Current completion request.")
-
-(defvar tabby--current-completion-response nil
-  "Current completion response.")
-
-(defvar tabby--status "initialization_done")
-
 (defun tabby-complete (&optional is-manual)
+  "Do completion. IS-MANUAL is non-nil if the completion is triggered manually."
   (interactive)
   (when (called-interactively-p 'any)
     (setq is-manual t))
@@ -301,6 +361,7 @@ Enabling event logging may slightly affect performance."
 	      (tabby--agent-provide-completions request on-response))))))
 
 (defun tabby--handle-completion-response (request response)
+  "Handle completion response."
   (when (eql tabby--ongoing-request-id (car response))
     (setq tabby--ongoing-request-id 0)
     (when-let* ((choices (plist-get (cadr response) :choices))
@@ -316,26 +377,10 @@ Enabling event logging may slightly affect performance."
 	 ,(plist-get choice :index))))))
 
 (defun tabby-dismiss ()
+  "Dismiss completion."
   (interactive)
   (setq tabby--current-completion-request nil)
   (tabby--clear-overlay))
-
-(defcustom tabby-clear-overlay-ignore-commands nil
-  "List of commands that should not clear the overlay when called."
-  :group 'tabby
-  :type '(repeat function))
-
-(defcustom tabby-enable-predicates '(evil-insert-state-p)
-  "A list of predicate functions with no argument to enable Tabby.
-Tabby will be triggered only if all predicates return t."
-  :type '(repeat function)
-  :group 'tabby)
-
-(defcustom tabby-disable-predicates nil
-  "A list of predicate functions with no argument to disable Tabby.
-Tabby will not be triggered if any predicate returns t."
-  :type '(repeat function)
-  :group 'tabby)
 
 (defmacro tabby--satisfy-predicates (enable disable)
   "Return t if satisfy all predicates in ENABLE and none in DISABLE."
@@ -349,35 +394,14 @@ Tabby will not be triggered if any predicate returns t."
 (defun tabby--satisfy-trigger-predicates ()
   (tabby--satisfy-predicates tabby-enable-predicates tabby-disable-predicates))
 
-(defvar tabby-mode-map (make-sparse-keymap)
-  "Keymap for Tabby minor mode.
-Use this for custom bindings in `tabby-mode'.")
-
-;;;###autoload
-(define-minor-mode tabby-mode
-  "Minor mode for Tabby."
-  :init-value nil
-  :lighter " Tabby"
-  (tabby-dismiss)
-  (if tabby-mode
-      (tabby--mode-enter)
-    (tabby--mode-exit)))
-
-(defun tabby--post-command-debounce (buffer)
-  "Complete in BUFFER."
-  (when (and (buffer-live-p buffer)
-             (equal (current-buffer) buffer)
-	     tabby-mode
-	     (tabby--satisfy-trigger-predicates))
-    (tabby-complete)))
 
 ;;; ui
-
 (defface tabby-overlay-face
   '((t :inherit shadow))
   "Face for tabby overlay")
 
 (defun tabby--overlay-visible ()
+  "Return t if the overlay is visible."
   (and (overlayp tabby--overlay)
        (overlay-buffer tabby--overlay)))
 
@@ -514,17 +538,33 @@ Use TRANSFORM-FN to transform completion if provided."
 
 
 ;;; tabby-mode
-(defvar tabby--post-command-timer nil)
 
-(defcustom tabby-idle-delay 0
-  "Time in seconds to wait before starting completion.
+(defun tabby--mode-enter ()
+  "Set up tabby mode when entering."
+  (add-hook 'post-command-hook 'tabby--post-command nil 'local))
 
-Complete immediately if set to 0.
-Disable idle completion if set to nil."
-  :type '(choice
-          (number :tag "Seconds of delay")
-          (const :tag "Idle completion disabled" nil))
-  :group 'tabby)
+(defun tabby--mode-exit ()
+  "Clean up tabby mode when exiting."
+  (remove-hook 'post-command-hook #'tabby--post-command 'local))
+
+(defun tabby--satisfy-display-predicates ()
+  "Return t if all display predicates are satisfied."
+  (tabby--satisfy-predicates tabby-enable-display-predicates tabby-disable-display-predicates))
+
+(defun tabby-turn-on-unless-buffer-read-only ()
+  "Turn on `tabby-mode' if the buffer is writable."
+  (unless buffer-read-only
+    (tabby-mode 1)))
+
+
+(defun tabby--post-command-debounce (buffer)
+  "Complete in BUFFER."
+  (when (and (buffer-live-p buffer)
+             (equal (current-buffer) buffer)
+	     tabby-mode
+	     (tabby--satisfy-trigger-predicates))
+    (tabby-complete)))
+
 
 (defun tabby--post-command ()
   "Complete in `post-command-hook' hook."
@@ -543,42 +583,15 @@ Disable idle completion if set to nil."
                                'tabby--post-command-debounce
                                (current-buffer)))))
 
-(defun tabby--overlay-end (ov)
-  "Return the end position of overlay OV."
-  (- (line-end-position) (overlay-get ov 'tail-length)))
-
-(defcustom tabby-enable-display-predicates nil
-  "A list of predicate functions with no argument to enable Tabby.
-Tabby will show completions only if all predicates return t."
-  :type '(repeat function)
-  :group 'tabby)
-
-(defcustom tabby-disable-display-predicates nil
-  "A list of predicate functions with no argument to disable Tabby.
-Tabby will not show completions if any predicate returns t."
-  :type '(repeat function)
-  :group 'tabby)
-
-(defun tabby--satisfy-display-predicates ()
-  "Return t if all display predicates are satisfied."
-  (tabby--satisfy-predicates tabby-enable-display-predicates tabby-disable-display-predicates))
-
-(defun tabby--mode-enter ()
-  "Set up tabby mode when entering."
-  (add-hook 'post-command-hook 'tabby--post-command nil 'local))
-
-(defun tabby--mode-exit ()
-  "Clean up tabby mode when exiting."
-  (remove-hook 'post-command-hook #'tabby--post-command 'local))
-
 ;;;###autoload
-(define-global-minor-mode global-tabby-mode
-  tabby-mode tabby-turn-on-unless-buffer-read-only)
-
-(defun tabby-turn-on-unless-buffer-read-only ()
-  "Turn on `tabby-mode' if the buffer is writable."
-  (unless buffer-read-only
-    (tabby-mode 1)))
+(define-minor-mode tabby-mode
+  "Minor mode for Tabby."
+  :init-value nil
+  :lighter " Tabby"
+  (tabby-dismiss)
+  (if tabby-mode
+      (tabby--mode-enter)
+    (tabby--mode-exit)))
 
 (provide 'tabby)
 ;;; tabby.el ends here
