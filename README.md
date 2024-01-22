@@ -15,6 +15,17 @@ git clone this repository.
 ;; example. active tabby-mode locally when entering go-ts-mode.
 (add-hook 'go-ts-mode-hook 'tabby-mode)
 ```
+
+Or using straight.el:
+
+```lisp
+(use-package tabby
+  :straight (tabby
+	     :type git
+	     :host github
+	     :files ("*.el" "node_scripts")
+	     :repo "alan-w-255/tabby.el"))
+```
  
 !!important!!
 Follow the [document](https://tabby.tabbyml.com/docs/extensions/configurations) to config the tabby client.
