@@ -101,27 +101,27 @@ Tabby will not show completions if any predicate returns t."
   :group 'tabby)
 
 (defcustom tabby-major-mode-alist '(("rustic" . "rust")
-				    ("cperl" . "perl")
-				    ("c++" . "cpp")
-				    ("clojurec" . "clojure")
-				    ("clojurescript" . "clojure")
-				    ("objc" . "objective-c")
-				    ("cuda" . "cuda-cpp")
-				    ("docker-compose" . "dockercompose")
-				    ("coffee" . "coffeescript")
-				    ("js" . "javascript")
-				    ("js2" . "javascript")
-				    ("js2-jsx" . "javascriptreact")
-				    ("typescript-tsx" . "typescriptreact")
-				    ("rjsx" . "typescriptreact")
-				    ("less-css" . "less")
-				    ("text" . "plaintext")
-				    ("ess-r" . "r")
-				    ("enh-ruby" . "ruby")
-				    ("shell-script" . "shellscript")
-				    ("sh" . "shellscript")
-				    ("visual-basic" . "vb")
-				    ("nxml" . "xml"))
+                                    ("cperl" . "perl")
+                                    ("c++" . "cpp")
+                                    ("clojurec" . "clojure")
+                                    ("clojurescript" . "clojure")
+                                    ("objc" . "objective-c")
+                                    ("cuda" . "cuda-cpp")
+                                    ("docker-compose" . "dockercompose")
+                                    ("coffee" . "coffeescript")
+                                    ("js" . "javascript")
+                                    ("js2" . "javascript")
+                                    ("js2-jsx" . "javascriptreact")
+                                    ("typescript-tsx" . "typescriptreact")
+                                    ("rjsx" . "typescriptreact")
+                                    ("less-css" . "less")
+                                    ("text" . "plaintext")
+                                    ("ess-r" . "r")
+                                    ("enh-ruby" . "ruby")
+                                    ("shell-script" . "shellscript")
+                                    ("sh" . "shellscript")
+                                    ("visual-basic" . "vb")
+                                    ("nxml" . "xml"))
   "Alist mapping major mode names (with -mode removed) to Tabby language ID's."
   :type '(alist :key-type string :value-type string)
   :group 'tabby)
@@ -195,20 +195,20 @@ Use this for custom bindings in `tabby-mode'.")
     (:emacs (:triggerMode ,tabby-trigger-mode))
     :session
     (:client ,(car (string-split (emacs-version) "\n"))
-	     :ide (:name "Emacs" :version ,(car (split-string emacs-version "\n")))
-	     :tabby_plugin (:name "TabbyML/emacs-tabby" :version ,tabby-version))))
+             :ide (:name "Emacs" :version ,(car (split-string emacs-version "\n")))
+             :tabby_plugin (:name "TabbyML/emacs-tabby" :version ,tabby-version))))
 
 (defun tabby--request (args &optional cb)
   "Send a request to the tabby agent with ARGS. CB is called with the response."
   (unless (tabby--connection-alivep)
     (tabby--agent-start))
   (let* ((id (tabby--next-request-id))
-	 (request (list id args))
-	 (buf (current-buffer))
-	 (on-success (lambda (response)
-		       (when cb
-			 (with-current-buffer buf
-			   (funcall cb response))))))
+         (request (list id args))
+         (buf (current-buffer))
+         (on-success (lambda (response)
+                       (when cb
+                         (with-current-buffer buf
+                           (funcall cb response))))))
     (push (cons id on-success) tabby--agent-request-callback-alist)
     (process-send-string tabby--connection (concat (json-encode request) "\n"))
     id))
@@ -227,15 +227,15 @@ Use this for custom bindings in `tabby-mode'.")
       (goto-char (point-max))
       (insert string)
       (when-let ((parsed (ignore-errors (json-parse-string string :object-type 'plist :array-type 'list))))
-	(tabby--agent-handle-response parsed)))))
+        (tabby--agent-handle-response parsed)))))
 
 (defun tabby--agent-connection-sentinel (_proc event)
   "Sentinel for tabby agent PROCESS."
   (if (or (string= event "finished\n")
-	  (string= event "deleted\n"))
+          (string= event "deleted\n"))
       (progn
-	(setq tabby--agent-status "exited")
-	(message "Tabby agent exited: %s" event))
+        (setq tabby--agent-status "exited")
+        (message "Tabby agent exited: %s" event))
     (user-error "Tabby agent exited unexpectedly: %s" event)))
 
 (defun tabby--agent-start ()
@@ -244,23 +244,23 @@ Use this for custom bindings in `tabby-mode'.")
   (if (not (locate-file tabby-node-executable exec-path))
       (user-error "Could not find node executable")
     (let ((node-version (thread-last (with-output-to-string
-				       (call-process tabby-node-executable nil standard-output nil "--version"))
-				     (s-trim)
-				     (s-chop-prefix "v")
-				     (string-to-number))))
+                                       (call-process tabby-node-executable nil standard-output nil "--version"))
+                                     (s-trim)
+                                     (s-chop-prefix "v")
+                                     (string-to-number))))
       (cond ((< node-version 18)
              (user-error "Node 18+ is required but found %s" node-version))
             (t
              (setq tabby--connection
                    (make-process :name "tabby agent"
-				 :buffer (get-buffer-create "*tabby agent*")
+                                 :buffer (get-buffer-create "*tabby agent*")
                                  :command (list tabby-node-executable
                                                 (concat tabby--base-dir "node_scripts/tabby-agent.js"))
                                  :coding 'utf-8-emacs-unix
                                  :connection-type 'pipe
                                  :stderr (get-buffer-create "*tabby stderr*")
-				 :filter 'tabby--agent-connection-filter
-				 :sentinel 'tabby--agent-connection-sentinel
+                                 :filter 'tabby--agent-connection-filter
+                                 :sentinel 'tabby--agent-connection-sentinel
                                  :noquery t))
              (message "Tabby agent started.")
              (tabby--agent-initialize))))))
@@ -301,9 +301,9 @@ Use this for custom bindings in `tabby-mode'.")
   "Provide completions for REQUEST. Call CB with the result."
   (tabby--ensure-connection-alive
    (tabby--request `(:func
-		     provideCompletions
-		     :args
-		     [,request :signal t]) cb)))
+                     provideCompletions
+                     :args
+                     [,request :signal t]) cb)))
 
 (defun tabby--agent-cancel-request (request-id)
   "Cancel request with REQUEST-ID."
@@ -319,14 +319,14 @@ Use this for custom bindings in `tabby-mode'.")
 (defun tabby--agent-handle-response (response)
   "Handle RESPONSE from the tabby agent."
   (when-let ((data (cadr response))
-	     (event (plist-get data :event)))
+             (event (plist-get data :event)))
     (cl-case event
       ("statusChanged"
        (setq tabby--agent-status (plist-get data :status)))
       ("issueChanged"
        (setq tabby--agent-issue (plist-get data :issue)))))
   (when-let* ((id (car response))
-	      (cb (alist-get id tabby--agent-request-callback-alist)))
+              (cb (alist-get id tabby--agent-request-callback-alist)))
     (funcall cb response)
     (setq tabby--agent-request-callback-alist (assq-delete-all id tabby--agent-request-callback-alist))))
 
@@ -347,7 +347,7 @@ Use this for custom bindings in `tabby-mode'.")
     ,(substring-no-properties (or (car kill-ring) ""))
     :manually
     ,(if is-manual
-	 t
+         t
        :json-false)))
 
 (defun tabby-complete (&optional is-manual)
@@ -357,29 +357,29 @@ Use this for custom bindings in `tabby-mode'.")
     (setq is-manual t))
   (when (string= tabby--status "initialization_done")
     (if (not (zerop tabby--ongoing-request-id))
-	(tabby--agent-cancel-request tabby--ongoing-request-id)
+        (tabby--agent-cancel-request tabby--ongoing-request-id)
       (let* ((request (tabby--get-completion-context is-manual))
-	     (on-response (lambda (response)
-			    (tabby--handle-completion-response request response))))
-	(setq tabby--current-completion-request request)
-	(setq tabby--ongoing-request-id
-	      (tabby--agent-provide-completions request on-response))))))
+             (on-response (lambda (response)
+                            (tabby--handle-completion-response request response))))
+        (setq tabby--current-completion-request request)
+        (setq tabby--ongoing-request-id
+              (tabby--agent-provide-completions request on-response))))))
 
 (defun tabby--handle-completion-response (request response)
   "Handle completion response."
   (when (eql tabby--ongoing-request-id (car response))
     (setq tabby--ongoing-request-id 0)
     (when-let* ((choices (plist-get (cadr response) :choices))
-		(choice (car choices)))
+                (choice (car choices)))
       (setq tabby--current-completion-response response)
       (tabby--overlay-show-completion request response)
       (tabby--agent-post-event
        `(:type
-	 "view"
-	 :completion_id
-	 ,(plist-get (cadr response) :id)
-	 :choice_index
-	 ,(plist-get choice :index))))))
+         "view"
+         :completion_id
+         ,(plist-get (cadr response) :id)
+         :choice_index
+         ,(plist-get choice :index))))))
 
 (defun tabby-dismiss ()
   "Dismiss completion."
@@ -445,9 +445,9 @@ command that triggered `post-command-hook'."
       (when (eq last-command-event (elt completion 0))
         (if (= (length completion) 1)
             ;; If there is only one char in the completion, accept it
-	    (progn
-	      (overlay-put ov 'completion "")
-	      (tabby-accept-completion))
+            (progn
+              (overlay-put ov 'completion "")
+              (tabby-accept-completion))
           (tabby--set-overlay-text ov (substring completion 1)))))))
 
 (defun tabby--set-overlay-text (ov completion)
@@ -455,37 +455,37 @@ command that triggered `post-command-hook'."
   (save-restriction
     (widen)
     (let* ((suffix-replace-chars (overlay-get ov 'suffix-replace-chars))
-	   (p-completion (concat (propertize completion 'face 'tabby-overlay-face)
-				 (if (eobp)
-				     ""
-				   (buffer-substring
-				    (point)
-				    (+ 1 (point) suffix-replace-chars))))))
+           (p-completion (concat (propertize completion 'face 'tabby-overlay-face)
+                                 (if (eobp)
+                                     ""
+                                   (buffer-substring
+                                    (point)
+                                    (+ 1 (point) suffix-replace-chars))))))
       (move-overlay ov (point) (+ 1 (point) suffix-replace-chars))
       (if (eobp)
-	  (progn
-	    (overlay-put ov 'display "")
-	    (overlay-put ov 'after-string p-completion))
- 	(overlay-put ov 'display (substring p-completion 0 1))
-	(overlay-put ov 'after-string (substring p-completion 1)))
+          (progn
+            (overlay-put ov 'display "")
+            (overlay-put ov 'after-string p-completion))
+        (overlay-put ov 'display (substring p-completion 0 1))
+        (overlay-put ov 'after-string (substring p-completion 1)))
       (overlay-put ov 'completion completion))))
 
 (defun tabby--overlay-show-completion (request response)
   "Render overlay."
   (tabby--clear-overlay)
   (when-let* ((choices (plist-get (cadr response) :choices))
-	      (choice (car choices))
-	      (choice-text (plist-get choice :text))
-	      ((not (zerop (length choice-text))))
-	      (replace-range (plist-get choice :replaceRange))
-	      (start (plist-get replace-range :start))
-	      (end (plist-get replace-range :end))
-	      (pos (plist-get request :position))
-	      (prefix-replace-chars (- pos start))
-	      (suffix-replace-chars (- end pos))
-	      (text (substring choice-text prefix-replace-chars))
-	      ((not (zerop (length text))))
-	      (ov (tabby--get-overlay)))
+              (choice (car choices))
+              (choice-text (plist-get choice :text))
+              ((not (zerop (length choice-text))))
+              (replace-range (plist-get choice :replaceRange))
+              (start (plist-get replace-range :start))
+              (end (plist-get replace-range :end))
+              (pos (plist-get request :position))
+              (prefix-replace-chars (- pos start))
+              (suffix-replace-chars (- end pos))
+              (text (substring choice-text prefix-replace-chars))
+              ((not (zerop (length text))))
+              (ov (tabby--get-overlay)))
     (when (= (point) (1+ pos))
       (overlay-put ov 'replace-end (1+ end))
       (overlay-put ov 'suffix-replace-chars suffix-replace-chars)
@@ -499,31 +499,31 @@ Use TRANSFORM-FN to transform completion if provided."
   (interactive)
   (when (tabby--overlay-visible)
     (let* ((completion (overlay-get tabby--overlay 'completion))
-	   (_replace-end (overlay-get tabby--overlay 'replace-end))
-	   (suffix-replace-chars (overlay-get tabby--overlay 'suffix-replace-chars))
-	   (completion-id (overlay-get tabby--overlay 'completion-id))
-	   (choice-index (overlay-get tabby--overlay 'choice-index))
-	   (t-completion (funcall (or transform-fn 'identity) completion)))
+           (_replace-end (overlay-get tabby--overlay 'replace-end))
+           (suffix-replace-chars (overlay-get tabby--overlay 'suffix-replace-chars))
+           (completion-id (overlay-get tabby--overlay 'completion-id))
+           (choice-index (overlay-get tabby--overlay 'choice-index))
+           (t-completion (funcall (or transform-fn 'identity) completion)))
       (tabby--agent-post-event
        `(:type
-	 "select"
-	 :completion_id
-	 ,completion-id
-	 :choice_index
-	 ,choice-index))
+         "select"
+         :completion_id
+         ,completion-id
+         :choice_index
+         ,choice-index))
       (tabby--clear-overlay)
       (delete-region (point) (+ (point) suffix-replace-chars))
       (insert t-completion)
       ;; if it is a partial completion
       (when (and (s-prefix-p t-completion completion)
                  (not (s-equals-p t-completion completion)))
-	(let ((ov (tabby--get-overlay))
-	      (suffix-len (if (< (+ (length t-completion) suffix-replace-chars) (length completion))
-			      suffix-replace-chars
-			    (- (length completion) (length t-completion)))))
-	  (when (< suffix-len 0)
-	    (setq suffix-len 0))
-	  (overlay-put ov 'suffix-replace-chars suffix-len)
+        (let ((ov (tabby--get-overlay))
+              (suffix-len (if (< (+ (length t-completion) suffix-replace-chars) (length completion))
+                              suffix-replace-chars
+                            (- (length completion) (length t-completion)))))
+          (when (< suffix-len 0)
+            (setq suffix-len 0))
+          (overlay-put ov 'suffix-replace-chars suffix-len)
           (tabby--set-overlay-text ov (s-chop-prefix t-completion completion))))
       t)))
 
@@ -567,8 +567,8 @@ Use TRANSFORM-FN to transform completion if provided."
   "Complete in BUFFER."
   (when (and (buffer-live-p buffer)
              (equal (current-buffer) buffer)
-	     tabby-mode
-	     (tabby--satisfy-trigger-predicates))
+             tabby-mode
+             (tabby--satisfy-trigger-predicates))
     (tabby-complete)))
 
 
