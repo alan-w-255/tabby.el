@@ -42,7 +42,7 @@
   :group 'completion
   :prefix "tabby-")
 
-(defconst tabby-version "1.2.0"
+(defconst tabby-version "1.3.2"
   "Tabby version.")
 
 ;; custom
@@ -468,19 +468,11 @@ command that triggered `post-command-hook'."
   (save-restriction
     (widen)
     (let* ((suffix-replace-chars (overlay-get ov 'suffix-replace-chars))
-           (p-completion (concat (propertize completion 'face 'tabby-overlay-face)
-                                 (if (eobp)
-                                     ""
-                                   (buffer-substring
-                                    (point)
-                                    (+ 1 (point) suffix-replace-chars))))))
-      (move-overlay ov (point) (+ 1 (point) suffix-replace-chars))
-      (if (eobp)
-          (progn
-            (overlay-put ov 'display "")
-            (overlay-put ov 'after-string p-completion))
-        (overlay-put ov 'display (substring p-completion 0 1))
-        (overlay-put ov 'after-string (substring p-completion 1)))
+           (p-completion (propertize completion 'face 'tabby-overlay-face)))
+      (move-overlay ov (point) (+ (point) suffix-replace-chars))
+      (add-text-properties 0 1 '(cursor 1) p-completion)
+      (overlay-put ov 'display "")
+      (overlay-put ov 'after-string p-completion)
       (overlay-put ov 'completion completion))))
 
 (defun tabby--overlay-show-completion (request response)
