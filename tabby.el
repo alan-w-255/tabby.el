@@ -469,10 +469,10 @@ command that triggered `post-command-hook'."
     (widen)
     (let* ((suffix-replace-chars (overlay-get ov 'suffix-replace-chars))
            (p-completion (propertize completion 'face 'tabby-overlay-face)))
-      (move-overlay ov (point) (+ (point) suffix-replace-chars))
       (add-text-properties 0 1 '(cursor 1) p-completion)
-      (overlay-put ov 'display "")
       (overlay-put ov 'after-string p-completion)
+      (overlay-put ov 'display (char-to-string ?\u200B)) ;; \u200B is a zero-width space. Trick to fix the wrong character inserted position.
+      (move-overlay ov (point) (+ (point) suffix-replace-chars))
       (overlay-put ov 'completion completion))))
 
 (defun tabby--overlay-show-completion (request response)
