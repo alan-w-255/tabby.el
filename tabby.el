@@ -1,7 +1,7 @@
 ;;; tabby.el --- An unofficial tabby plugin for Emacs  -*- lexical-binding:t -*-
 
 ;; Author: Alan Wong <heywym@qq.com>
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "27.2") (s "1.12.0"))
 ;; Keywords: tabby, completion, llm, copilot
 ;; URL: http://github.com/alan-w-255/tabby.el
