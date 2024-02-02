@@ -42,7 +42,7 @@
   :group 'completion
   :prefix "tabby-")
 
-(defconst tabby-version "1.2.0"
+(defconst tabby-version "1.3.2"
   "Tabby version.")
 
 ;; custom
