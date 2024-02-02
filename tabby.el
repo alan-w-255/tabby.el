@@ -384,8 +384,21 @@ Use this for custom bindings in `tabby-mode'.")
 (defun tabby-dismiss ()
   "Dismiss completion."
   (interactive)
-  (setq tabby--current-completion-request nil)
-  (tabby--clear-overlay))
+  (when tabby--current-completion-request
+    (setq tabby--current-completion-request nil)
+    (tabby--clear-overlay)
+    (when-let* ((response tabby--current-completion-response)
+                (completion-id (cadr response))
+                (choices (plist-get (cadr response) :choices))
+                (choice (car choices)))
+      (setq tabby--current-completion-response nil)
+      (tabby--agent-post-event
+       `(:type
+         "dismiss"
+         :completion_id
+         ,completion-id
+         :choice_index
+         ,(plist-get choice :index))))))
 
 (defmacro tabby--satisfy-predicates (enable disable)
   "Return t if satisfy all predicates in ENABLE and none in DISABLE."
