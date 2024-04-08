@@ -78,7 +78,7 @@ Tabby will not be triggered if any predicate returns t."
   :type '(repeat function)
   :group 'tabby)
 
-(defcustom tabby-idle-delay 0
+(defcustom tabby-idle-delay 0.2
   "Time in seconds to wait before starting completion.
 
 Complete immediately if set to 0.
