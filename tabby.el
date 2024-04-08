@@ -594,6 +594,8 @@ Use TRANSFORM-FN to transform completion if provided."
                                'tabby--post-command-debounce
                                (current-buffer)))))
 
+(advice-add 'keyboard-quit :after #'tabby-dismiss)
+
 ;;;###autoload
 (define-minor-mode tabby-mode
   "Minor mode for Tabby."
