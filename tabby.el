@@ -194,7 +194,7 @@ Use this for custom bindings in `tabby-mode'.")
   `(:user
     (:emacs (:triggerMode ,tabby-trigger-mode))
     :session
-    (:client ,(car (string-split (emacs-version) "\n"))
+    (:client ,(car (split-string (emacs-version) "\n"))
              :ide (:name "Emacs" :version ,(car (split-string emacs-version "\n")))
              :tabby_plugin (:name "TabbyML/emacs-tabby" :version ,tabby-version))))
 
