@@ -26,7 +26,7 @@ Or using straight.el:
 	     :files ("*.el" "node_scripts")
 	     :repo "alan-w-255/tabby.el"))
 ```
- 
+
 !!important!!
 Follow the [document](https://tabby.tabbyml.com/docs/extensions/configurations) to config the tabby client.
 
@@ -45,7 +45,13 @@ Here is my configuration.
   (kbd "C-l") 'tabby-accept-completion-by-line)
 ```
 
-## warning
+## Note
 
 This plugin works on my machine, but there may be many bugs that have not been discovered yet. Please feel free to raise an issue if you encounter any problems.
 
+The node_script folder is copied from https://github.com/TabbyML/tabby/tree/main/clients/vim/node_scripts . I don't know much about javascript. It just works. You can also copy the node_scripts folder from the official tabby repository.
+
+## Acknowledgements
+
+- [copilot.el](https://github.com/copilot-emacs/copilot.el)
+- [tabby](https://github.com/TabbyML/tabby)
