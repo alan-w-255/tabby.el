@@ -66,7 +66,7 @@ Enabling event logging may slightly affect performance."
   :group 'tabby
   :type '(repeat function))
 
-(defcustom tabby-enable-predicates '(evil-insert-state-p)
+(defcustom tabby-enable-predicates nil
   "A list of predicate functions with no argument to enable Tabby.
 Tabby will be triggered only if all predicates return t."
   :group 'tabby
