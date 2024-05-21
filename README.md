@@ -45,6 +45,30 @@ Here is my configuration.
   (kbd "C-l") 'tabby-accept-completion-by-line)
 ```
 
+## Customization
+
+- `tabby-enable-predicates` A list of predicate functions with no argument to enable Tabby.
+Tabby will be triggered only if all predicates return t.
+
+If you are using evil, you may be recommended to add `evil-insert-state-p` to `tabby-enable-predicates`.
+
+Example:
+
+```emacs-lisp
+(setq tabby-enable-predicates '(evil-insert-state-p))
+```
+
+- `tabby-disable-predicates` A list of predicate functions with no argument to disable Tabby.
+Tabby will not be triggered if any predicate returns t.
+
+- `tabby-idle-delay` Time in seconds to wait before starting completion. Complete immediately if set to 0. Disable idle completion if set to nil.
+
+- `tabby-enable-display-predicates` A list of predicate functions with no argument to enable Tabby.
+Tabby will show completions only if all predicates return t.
+
+- `tabby-disable-display-predicates` A list of predicate functions with no argument to disable Tabby.
+Tabby will not show completions if any predicate returns t.
+
 ## Note
 
 This plugin works on my machine, but there may be many bugs that have not been discovered yet. Please feel free to raise an issue if you encounter any problems.
