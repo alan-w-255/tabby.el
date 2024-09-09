@@ -53,14 +53,6 @@ Enabling event logging may slightly affect performance."
   :group 'tabby
   :type 'integer)
 
-(defcustom tabby-node-executable
-  (if (eq system-type 'windows-nt)
-      "node.exe"
-    "node")
-  "Node executable path."
-  :group 'tabby
-  :type 'string)
-
 (defcustom tabby-clear-overlay-ignore-commands nil
   "List of commands that should not clear the overlay when called."
   :group 'tabby
@@ -220,166 +212,79 @@ Use this for custom bindings in `tabby-mode'.")
 
 ;;; agent
 
-(defun tabby--agent-connection-filter (process string)
-  "Filter for tabby agent PROCESS."
-  (with-current-buffer (process-buffer process)
-    (let ((inhibit-read-only t))
-      (goto-char (point-max))
-      (insert string)
-      (when-let ((parsed (ignore-errors (json-parse-string string :object-type 'plist :array-type 'list))))
-        (tabby--agent-handle-response parsed)))))
+(defvar deepseek-bearer-token (auth-source-pick-first-password :host "api.deepseek.com" :user "alan"))
 
-(defun tabby--agent-connection-sentinel (_proc event)
-  "Sentinel for tabby agent PROCESS."
-  (if (or (string= event "finished\n")
-          (string= event "deleted\n"))
-      (progn
-        (setq tabby--agent-status "exited")
-        (message "Tabby agent exited: %s" event))
-    (user-error "Tabby agent exited unexpectedly: %s" event)))
+(defvar test-response-data nil)
 
-(defun tabby--agent-start ()
-  "Start the tabby agent process in local."
-  (interactive)
-  (if (not (locate-file tabby-node-executable exec-path))
-      (user-error "Could not find node executable")
-    (let ((node-version (thread-last (with-output-to-string
-                                       (call-process tabby-node-executable nil standard-output nil "--version"))
-                                     (s-trim)
-                                     (s-chop-prefix "v")
-                                     (string-to-number))))
-      (cond ((< node-version 18)
-             (user-error "Node 18+ is required but found %s" node-version))
-            (t
-             (setq tabby--connection
-                   (make-process :name "tabby agent"
-                                 :buffer (get-buffer-create "*tabby agent*")
-                                 :command (list tabby-node-executable
-                                                (concat tabby--base-dir "node_scripts/tabby-agent.js"))
-                                 :coding 'utf-8-emacs-unix
-                                 :connection-type 'pipe
-                                 :stderr (get-buffer-create "*tabby stderr*")
-                                 :filter 'tabby--agent-connection-filter
-                                 :sentinel 'tabby--agent-connection-sentinel
-                                 :noquery t))
-             (message "Tabby agent started.")
-             (tabby--agent-initialize))))))
+(defun handle-response (status id)
+  (goto-char (point-min))
+  (re-search-forward "^$")
+  (delete-region (point-min) (point))
+  (let ((response (json-read)))
+    (setq test-response-data `((fim-id . ,id) ,response))))
 
-(defmacro tabby--ensure-connection-alive (&rest body)
-  "Evaluate BODY if the tabby agent is alive. If not, start the agent."
-  `(progn
-     (unless (tabby--connection-alivep)
-       (tabby--agent-start))
-     (when (tabby--connection-alivep)
-       ,@body)))
+(fset 'deepseek-get-fim-id
+      ((lambda ()
+         (let ((_id -1))
+           (lambda ()
+             (setq _id (1+ _id))
+             _id)))))
 
-(defun tabby-agent-close ()
-  "Close the tabby agent process."
-  (interactive)
-  (tabby--ensure-connection-alive
-   (delete-process tabby--connection)
-   (setq tabby--connection nil)
-   (setq tabby--agent-status "exited")
-   (setq tabby--request-id 0)))
+;; (deepseek-get-fim-id)
 
-(defun tabby--agent-on-error (data)
-  "Handle agent error, DATA is the error message."
-  (message "Tabby agent error: %s" data))
+(defun deepcoder-fim ()
+  (let* ((url "https://api.deepseek.com/beta/completions")
+         (headers `(("Content-Type" . "application/json")
+                    ("Accept" . "application/json")
+                    ("Authorization" . ,(format "Bearer %s" deepseek-bearer-token))))
+         (data (json-encode '((model . "deepseek-chat")
+                              (prompt . "Once upon a time, ")
+                              (echo . :json-false))))
+         (url-request-method "POST")
+         (url-request-extra-headers headers)
+         (url-request-data data))
+    (url-retrieve url 'handle-response `(,(deepseek-get-fim-id)))))
 
-(defun tabby--agent-on-exit (data)
-  "Handle agent exit, DATA is the exit message."
-  (setq tabby--connection nil)
-  (setq tabby--agent-status "exited")
-  (message "Tabby agent exited: %s" data))
 
-(defun tabby--agent-initialize ()
-  "Initialize the tabby agent."
-  (tabby--ensure-connection-alive
-   (tabby--request `(:func initialize :args [(:clientProperties ,(tabby--get-client-properties))]))))
-
-(defun tabby--agent-provide-completions (request cb)
-  "Provide completions for REQUEST. Call CB with the result."
-  (tabby--ensure-connection-alive
-   (tabby--request `(:func
-                     provideCompletions
-                     :args
-                     [,request :signal t]) cb)))
-
-(defun tabby--agent-cancel-request (request-id)
-  "Cancel request with REQUEST-ID."
-  (tabby--ensure-connection-alive
-   (tabby--request `(:func cancelRequest :args [,request-id]))
-   (setq tabby--ongoing-request-id 0)))
-
-(defun tabby--agent-post-event (event)
-  "Post EVENT to the tabby agent."
-  (tabby--ensure-connection-alive
-   (tabby--request `(:func postEvent :args [,event]))))
-
-(defun tabby--agent-handle-response (response)
-  "Handle RESPONSE from the tabby agent."
-  (when-let ((data (cadr response))
-             (event (plist-get data :event)))
-    (cl-case event
-      ("statusChanged"
-       (setq tabby--agent-status (plist-get data :status)))
-      ("issueChanged"
-       (setq tabby--agent-issue (plist-get data :issue)))))
-  (when-let* ((id (car response))
-              (cb (alist-get id tabby--agent-request-callback-alist)))
-    (funcall cb response)
-    (setq tabby--agent-request-callback-alist (assq-delete-all id tabby--agent-request-callback-alist))))
+;; (deepcoder-fim)
 
 
 ;;; completion
 
-(defun tabby--get-completion-context (is-manual)
+(defun tabby--get-completion-context ()
   "Get completion context."
   `(:filepath
     ,(buffer-file-name)
-    :language
-    ,(tabby--get-language)
-    :text
-    ,(buffer-substring-no-properties (point-min) (point-max))
-    :position
-    ,(1- (point))
-    :clipboard
-    ,(substring-no-properties (or (car kill-ring) ""))
-    :manually
-    ,(if is-manual
-         t
-       :json-false)))
+    :prompt
+    ,(buffer-substring-no-properties (point-min) (point))
+    :suffix
+    ,(buffer-substring-no-properties (point) (point-max))))
 
-(defun tabby-complete (&optional is-manual)
-  "Do completion. IS-MANUAL is non-nil if the completion is triggered manually."
+(defun tabby-complete ()
+  "Do completion."
   (interactive)
   (when (called-interactively-p 'any)
     (setq is-manual t))
   (when (string= tabby--status "initialization_done")
     (if (not (zerop tabby--ongoing-request-id))
         (tabby--agent-cancel-request tabby--ongoing-request-id)
-      (let* ((request (tabby--get-completion-context is-manual))
-             (on-response (lambda (response)
-                            (tabby--handle-completion-response request response))))
-        (setq tabby--current-completion-request request)
-        (setq tabby--ongoing-request-id
-              (tabby--agent-provide-completions request on-response))))))
+      (let* ((request (tabby--get-completion-context)))
+        (setq tabby--current-completion-request request)))))
 
-(defun tabby--handle-completion-response (request response)
+(defun tabby--handle-completion-response (response)
   "Handle completion response."
-  (when (eql tabby--ongoing-request-id (car response))
+  (when (eql tabby--ongoing-request-id (assq 'completion-id response))
     (setq tabby--ongoing-request-id 0)
-    (when-let* ((choices (plist-get (cadr response) :choices))
-                (choice (car choices)))
-      (setq tabby--current-completion-response response)
-      (tabby--overlay-show-completion request response)
-      (tabby--agent-post-event
-       `(:type
-         "view"
-         :completion_id
-         ,(plist-get (cadr response) :id)
-         :choice_index
-         ,(plist-get choice :index))))))
+    (when-let* ((completion-id (assq 'completion-id response))
+                (text (cdr (assq 'text
+                                 (aref
+                                  (cdr (assq 'choices
+                                             (cadr response)))
+                                  0)))))
+      (setq tabby--current-completion-response text)
+      (tabby--overlay-show-completion `((completion-id . ,completion-id)
+                                        (text . ,text))))))
+
 
 (defun tabby-dismiss ()
   "Dismiss completion."
@@ -391,14 +296,7 @@ Use this for custom bindings in `tabby-mode'.")
                 (completion-id (cadr response))
                 (choices (plist-get (cadr response) :choices))
                 (choice (car choices)))
-      (setq tabby--current-completion-response nil)
-      (tabby--agent-post-event
-       `(:type
-         "dismiss"
-         :completion_id
-         ,completion-id
-         :choice_index
-         ,(plist-get choice :index))))))
+      (setq tabby--current-completion-response nil))))
 
 (defmacro tabby--satisfy-predicates (enable disable)
   "Return t if satisfy all predicates in ENABLE and none in DISABLE."
@@ -467,36 +365,21 @@ command that triggered `post-command-hook'."
   "Set overlay OV with COMPLETION."
   (save-restriction
     (widen)
-    (let* ((suffix-replace-chars (overlay-get ov 'suffix-replace-chars))
-           (p-completion (propertize completion 'face 'tabby-overlay-face)))
+    (let* ((p-completion (propertize completion 'face 'tabby-overlay-face)))
       (add-text-properties 0 1 '(cursor 1) p-completion)
       (overlay-put ov 'after-string p-completion)
       (overlay-put ov 'display (char-to-string ?\u200B)) ;; \u200B is a zero-width space. Trick to fix the wrong character inserted position.
-      (move-overlay ov (point) (+ (point) suffix-replace-chars))
+      (move-overlay ov (point) (point))
       (overlay-put ov 'completion completion))))
 
-(defun tabby--overlay-show-completion (request response)
+(defun tabby--overlay-show-completion (completion)
   "Render overlay."
   (tabby--clear-overlay)
-  (when-let* ((choices (plist-get (cadr response) :choices))
-              (choice (car choices))
-              (choice-text (plist-get choice :text))
-              ((not (zerop (length choice-text))))
-              (replace-range (plist-get choice :replaceRange))
-              (start (plist-get replace-range :start))
-              (end (plist-get replace-range :end))
-              (pos (plist-get request :position))
-              (prefix-replace-chars (- pos start))
-              (suffix-replace-chars (- end pos))
-              (text (substring choice-text prefix-replace-chars))
-              ((not (zerop (length text))))
-              (ov (tabby--get-overlay)))
-    (when (= (point) (1+ pos))
-      (overlay-put ov 'replace-end (1+ end))
-      (overlay-put ov 'suffix-replace-chars suffix-replace-chars)
-      (overlay-put ov 'completion-id (plist-get (cadr response) :id))
-      (overlay-put ov 'choice-index (plist-get choice :index))
-      (tabby--set-overlay-text ov text))))
+  (when-let* ((completion-id (assq 'id completion))
+              (text (assq 'text completion)))
+    (overlay-put ov 'replace-end (+ (point) (length text)))
+    (overlay-put ov 'completion-id (plist-get (cadr response) :id))
+    (tabby--set-overlay-text ov text)))
 
 (defun tabby-accept-completion (&optional transform-fn)
   "Accept completion. Return t if there is a completion.
